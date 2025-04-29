@@ -144,7 +144,7 @@ export default function RoomStatus({ room, leader, expanded = false }: RoomStatu
               
               {incomingPilot && (
                 <div className="p-3 border rounded-md">
-                  <div className="text-sm font-medium">Incoming Pilot</div>
+                  <div className="text-sm font-medium">Incoming</div>
                   <div className="flex items-center gap-2 mt-2">
                     <Avatar className="h-8 w-8">
                       <AvatarFallback>{getInitials(incomingPilot.name)}</AvatarFallback>
