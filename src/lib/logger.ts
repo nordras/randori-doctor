@@ -21,7 +21,7 @@ class Logger {
       (entry.type === 'movement' 
         ? `Moved from Room ${entry.fromRoom} to Room ${entry.toRoom}`
         : `Role changed from ${entry.fromRole} to ${entry.toRole}`);
-
+    // TODO write a file or connect it on a small api, maybe I should put it on nexstjs
     console.log(logLine);
   }
 
