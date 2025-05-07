@@ -23,6 +23,7 @@ export interface Room {
   name: string;
   leaderId: string;
   participants: string[];
+  status: 'active' | 'finished';
 }
 
 export interface Session {

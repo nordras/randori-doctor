@@ -5,7 +5,7 @@ import {
   Leader,
   Room,
   Session,
-  Role,
+  // Role,
   generateMockData
 } from '@/lib/models';
 import Logger from '@/lib/logger';
@@ -51,7 +51,7 @@ export default function SessionProvider({ children }: SessionProviderProps) {
   });
 
   const [timeRemaining, setTimeRemaining] = useState(ROUND_DURATION);
-  const [rooms, setRooms] = useState<Room[]>(mockData.rooms);
+  const [rooms] = useState<Room[]>(mockData.rooms);
   const [participants, setParticipants] = useState<Participant[]>(mockData.participants);
   const [leaders] = useState<Leader[]>(mockData.leaders);
 
@@ -100,6 +100,21 @@ export default function SessionProvider({ children }: SessionProviderProps) {
     });
   }, []);
 
+  const finishRoom = useCallback((roomId: string) => {
+
+    const updatedRooms = rooms.map(room =>
+      room.id === roomId ? { ...room, status: 'finished' } : room
+    );
+
+    const activeRooms = updatedRooms.filter(room => room.status === 'active');
+
+    toast({
+      title: 'Sala finalizada',
+      description: `A sala ${roomId} foi encerrada e seus membros redistribuídos.`,
+    });
+  }, [participants, rooms, toast]);
+
+
   const advanceRound = useCallback(() => {
     rotateParticipants();
     setSession((prev) => ({
@@ -116,17 +131,17 @@ export default function SessionProvider({ children }: SessionProviderProps) {
   const rotateParticipants = useCallback(() => {
     setParticipants((prevParticipants) => {
       const updatedParticipants = [...prevParticipants];
-  
+
       rooms.forEach((room, roomIndex) => {
         const roomParticipants = updatedParticipants.filter(p => p.currentRoomId === room.id);
-  
+
         const pilot = roomParticipants.find(p => p.role === 'pilot');
         const copilot = roomParticipants.find(p => p.role === 'copilot');
-  
+
         if (pilot && copilot) {
           const nextRoomIndex = (roomIndex + 1) % rooms.length;
           const nextRoomId = rooms[nextRoomIndex].id;
-  
+
           // Atualizar o piloto: mover para próxima sala como observer
           const pilotIndex = updatedParticipants.findIndex(p => p.id === pilot.id);
           updatedParticipants[pilotIndex] = {
@@ -138,44 +153,45 @@ export default function SessionProvider({ children }: SessionProviderProps) {
                 .filter(p => p.currentRoomId === nextRoomId)
                 .map(p => p.position),
               -1
-            ) + 1 // posição no final da nova sala
+            ) + 1
           };
-  
+
           Logger.logRoleChange(pilot.id, pilot.name, 'pilot', 'observer');
           Logger.logMovement(pilot.id, pilot.name, room.id, nextRoomId);
-  
+
           // Atualizar o copilot atual para piloto
           const copilotIndex = updatedParticipants.findIndex(p => p.id === copilot.id);
           updatedParticipants[copilotIndex] = {
             ...updatedParticipants[copilotIndex],
             role: 'pilot',
-            position: 0 // piloto sempre na posição 0
+            position: 0
           };
-  
+
           Logger.logRoleChange(copilot.id, copilot.name, 'copilot', 'pilot');
-  
+
           // Promover o próximo observer para copilot
           const nextCopilot = roomParticipants
             .filter(p => p.role === 'observer')
             .sort((a, b) => a.position - b.position)[0];
-  
+
+          // Garante que se houver um próximo copilot, promovê-lo
           if (nextCopilot) {
             const nextCopilotIndex = updatedParticipants.findIndex(p => p.id === nextCopilot.id);
             updatedParticipants[nextCopilotIndex] = {
               ...updatedParticipants[nextCopilotIndex],
               role: 'copilot',
-              position: 1 // copiloto sempre na posição 1
+              position: 1
             };
-  
+
             Logger.logRoleChange(nextCopilot.id, nextCopilot.name, 'observer', 'copilot');
           }
         }
       });
-  
+
       return updatedParticipants;
     });
   }, [rooms]);
-  
+
   return (
     <SessionContext.Provider
       value={{
@@ -187,6 +203,7 @@ export default function SessionProvider({ children }: SessionProviderProps) {
         pauseSession,
         resetTimer,
         advanceRound,
+        finishRoom,
         isRunning: session.isRunning,
         timeRemaining
       }}

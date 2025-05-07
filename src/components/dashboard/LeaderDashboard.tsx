@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSession } from '@/context/SessionContext';
-import RoomStatus from './RoomStatus';
+import RoomDetailed from './RoomDetailed';
 import SessionControls from './SessionControls';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -45,7 +45,7 @@ export default function LeaderDashboard() {
             {rooms.map(room => {
               const leader = leaders.find(l => l.roomId === room.id);
               return (
-                <RoomStatus
+                <RoomDetailed
                   key={room.id}
                   room={room}
                   leader={leader}
@@ -72,7 +72,7 @@ export default function LeaderDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <RoomStatus
+                  <RoomDetailed
                     key={room.id}
                     room={room}
                     leader={leader}

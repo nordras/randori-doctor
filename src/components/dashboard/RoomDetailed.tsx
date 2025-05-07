@@ -5,13 +5,13 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ArrowRightIcon, Code2Icon, MonitorIcon, UsersRoundIcon } from 'lucide-react';
 
-interface RoomStatusProps {
+interface RoomDetailedProps {
   room: Room;
   leader?: Leader;
   expanded?: boolean;
 }
 
-export default function RoomStatus({ room, leader, expanded = false }: RoomStatusProps) {
+export default function RoomDetailed({ room, leader, expanded = false }: RoomDetailedProps) {
   const { participants } = useSession();
   const roomParticipants = participants.filter(p => p.currentRoomId === room.id);
   
@@ -93,7 +93,7 @@ export default function RoomStatus({ room, leader, expanded = false }: RoomStatu
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <h3 className="text-sm font-medium mb-2">Current Participants</h3>
+          <h3 className="text-sm font-medium mb-2">Current Participants 1231</h3>
           <div className="space-y-2">
             {sortedParticipants.map(participant => (
               <div 
