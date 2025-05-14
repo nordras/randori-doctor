@@ -1,5 +1,14 @@
-// Types
-export type Role = 'pilot' | 'copilot' | 'observer';
+// Types and Enums
+export enum Role {
+  Pilot = 'pilot',
+  Copilot = 'copilot',
+  Observer = 'observer'
+}
+
+export enum RoomStatus {
+  Active = 'active',
+  Finished = 'finished'
+}
 
 export interface Participant {
   id: string;
@@ -7,7 +16,7 @@ export interface Participant {
   slackHandle: string;
   currentRoomId: string;
   role: Role;
-  position: number; // Position in the rotation
+  position: number;
 }
 
 export interface Leader {
@@ -23,7 +32,7 @@ export interface Room {
   name: string;
   leaderId: string;
   participants: string[];
-  status: 'active' | 'finished';
+  status: RoomStatus;
 }
 
 export interface Session {
@@ -35,15 +44,14 @@ export interface Session {
 
 // Mock data generator
 export function generateMockData() {
-  // Generate 6 rooms
   const rooms: Room[] = Array(6).fill(0).map((_, index) => ({
     id: `room-${index + 1}`,
     name: `Room ${index + 1}`,
     leaderId: `leader-${index + 1}`,
-    participants: []
+    participants: [],
+    status: RoomStatus.Active
   }));
 
-  // Generate 6 leaders (one per room)
   const leaders: Leader[] = Array(6).fill(0).map((_, index) => ({
     id: `leader-${index + 1}`,
     name: `Leader ${index + 1}`,
@@ -52,18 +60,15 @@ export function generateMockData() {
     zoomLink: `https://zoom.us/j/meeting${index + 1}`
   }));
 
-  // Generate 30 participants (5 per room)
   const participants: Participant[] = [];
 
   rooms.forEach((room, roomIndex) => {
     for (let i = 0; i < 5; i++) {
       const participantId = `participant-${roomIndex * 5 + i + 1}`;
-      
-      // Determine initial roles
-      let role: Role = 'observer';
-      if (i === 0) role = 'pilot';
-      if (i === 1) role = 'copilot';
-      
+      let role: Role = Role.Observer;
+      if (i === 0) role = Role.Pilot;
+      if (i === 1) role = Role.Copilot;
+
       participants.push({
         id: participantId,
         name: `Participant ${roomIndex * 5 + i + 1}`,
@@ -72,34 +77,28 @@ export function generateMockData() {
         role,
         position: i
       });
-      
-      // Add participant ID to room
+
       room.participants.push(participantId);
     }
   });
 
-  return {
-    rooms,
-    leaders,
-    participants
-  };
+  return { rooms, leaders, participants };
 }
 
 // Helper functions
 export function formatTime(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
-  return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
 export function getRoleColor(role: Role): string {
   switch (role) {
-    case 'pilot':
+    case Role.Pilot:
       return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-    case 'copilot':
+    case Role.Copilot:
       return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-    case 'observer':
-      return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+    case Role.Observer:
     default:
       return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
   }
@@ -107,11 +106,11 @@ export function getRoleColor(role: Role): string {
 
 export function getRoleBadgeVariant(role: Role): 'default' | 'outline' | 'secondary' | 'destructive' {
   switch (role) {
-    case 'pilot':
+    case Role.Pilot:
       return 'default';
-    case 'copilot':
+    case Role.Copilot:
       return 'secondary';
-    case 'observer':
+    case Role.Observer:
     default:
       return 'outline';
   }

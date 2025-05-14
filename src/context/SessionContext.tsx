@@ -4,8 +4,9 @@ import {
   Participant,
   Leader,
   Room,
+  RoomStatus,
   Session,
-  // Role,
+  Role,
   generateMockData
 } from '@/lib/models';
 import Logger from '@/lib/logger';
@@ -17,6 +18,7 @@ interface SessionContextProps {
   leaders: Leader[];
   startSession: () => void;
   pauseSession: () => void;
+  endSession: (roomId: string) => void;
   resetTimer: () => void;
   advanceRound: () => void;
   isRunning: boolean;
@@ -51,7 +53,7 @@ export default function SessionProvider({ children }: SessionProviderProps) {
   });
 
   const [timeRemaining, setTimeRemaining] = useState(ROUND_DURATION);
-  const [rooms] = useState<Room[]>(mockData.rooms);
+  const [rooms, setRooms] = useState<Room[]>(mockData.rooms);
   const [participants, setParticipants] = useState<Participant[]>(mockData.participants);
   const [leaders] = useState<Leader[]>(mockData.leaders);
 
@@ -100,33 +102,54 @@ export default function SessionProvider({ children }: SessionProviderProps) {
     });
   }, []);
 
-  const finishRoom = useCallback((roomId: string) => {
+  const endSession = useCallback((roomId: string) => {
+    setRooms(prevRooms => prevRooms.map(room =>
+      room.id === roomId ? { ...room, status: RoomStatus.Finished } : room
+    ));
 
-    const updatedRooms = rooms.map(room =>
-      room.id === roomId ? { ...room, status: 'finished' } : room
-    );
+    const activeRooms = rooms.filter(room => room.id !== roomId && room.status === RoomStatus.Active);
 
-    const activeRooms = updatedRooms.filter(room => room.status === 'active');
+    if (activeRooms.length === 0) {
+      toast({
+        title: 'Erro',
+        description: 'Não há salas ativas para redistribuir os participantes.',
+      });
+      return;
+    }
+
+    setParticipants(prevParticipants => {
+      const closingParticipants = prevParticipants.filter(p => p.currentRoomId === roomId);
+      const updatedParticipants = [...prevParticipants];
+
+      closingParticipants.forEach((participant, index) => {
+        const targetRoom = activeRooms[index % activeRooms.length];
+        const nextPosition = Math.max(
+          ...updatedParticipants
+            .filter(p => p.currentRoomId === targetRoom.id)
+            .map(p => p.position),
+          -1
+        ) + 1;
+
+        const participantIndex = updatedParticipants.findIndex(p => p.id === participant.id);
+        updatedParticipants[participantIndex] = {
+          ...participant,
+          currentRoomId: targetRoom.id,
+          role: Role.Observer,
+          position: nextPosition
+        };
+
+        Logger.logMovement(participant.id, participant.name, roomId, targetRoom.id);
+      });
+
+      return updatedParticipants;
+    });
 
     toast({
       title: 'Sala finalizada',
-      description: `A sala ${roomId} foi encerrada e seus membros redistribuídos.`,
+      description: `A sala ${roomId} foi encerrada e os participantes foram redistribuídos.`,
     });
-  }, [participants, rooms, toast]);
+  }, [rooms, toast]);
 
-
-  const advanceRound = useCallback(() => {
-    rotateParticipants();
-    setSession((prev) => ({
-      ...prev,
-      currentRound: prev.currentRound + 1,
-    }));
-    setTimeRemaining(ROUND_DURATION);
-    toast({
-      title: "New Round Started",
-      description: `Round ${session.currentRound + 1} has begun. Roles and rooms have been updated.`,
-    });
-  }, [session.currentRound, participants, rooms]);
 
   const rotateParticipants = useCallback(() => {
     setParticipants((prevParticipants) => {
@@ -192,6 +215,19 @@ export default function SessionProvider({ children }: SessionProviderProps) {
     });
   }, [rooms]);
 
+  const advanceRound = useCallback(() => {
+    rotateParticipants();
+    setSession((prev) => ({
+      ...prev,
+      currentRound: prev.currentRound + 1,
+    }));
+    setTimeRemaining(ROUND_DURATION);
+    toast({
+      title: "New Round Started",
+      description: `Round ${session.currentRound + 1} has begun. Roles and rooms have been updated.`,
+    });
+  }, [rotateParticipants, toast]);
+
   return (
     <SessionContext.Provider
       value={{
@@ -203,7 +239,7 @@ export default function SessionProvider({ children }: SessionProviderProps) {
         pauseSession,
         resetTimer,
         advanceRound,
-        finishRoom,
+        endSession,
         isRunning: session.isRunning,
         timeRemaining
       }}
