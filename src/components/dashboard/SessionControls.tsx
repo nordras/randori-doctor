@@ -12,6 +12,8 @@ export default function SessionControls() {
     endSession,
     resetTimer,
     advanceRound,
+    undo,
+    redo,
     session,
     rooms,
     timeRemaining
@@ -49,7 +51,7 @@ export default function SessionControls() {
             <div className="text-sm bg-muted px-3 py-1 rounded-md flex items-center gap-1">
               Time: {Math.floor(timeRemaining / 60)}:{String(timeRemaining % 60).padStart(2, '0')}
             </div>
-            
+
             <div className="flex flex-wrap gap-2 items-center">
               <Select value={selectedRoomId} onValueChange={setSelectedRoomId}>
                 <SelectTrigger className="w-48">
@@ -71,6 +73,12 @@ export default function SessionControls() {
                 disabled={!selectedRoomId}
               >
                 Finish Room
+              </Button>
+              <Button onClick={undo} variant="secondary" size="sm" className="gap-1">
+                Undo
+              </Button>
+              <Button onClick={redo} variant="secondary" size="sm" className="gap-1">
+                Redo
               </Button>
             </div>
           </div>

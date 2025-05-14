@@ -21,6 +21,8 @@ interface SessionContextProps {
   endSession: (roomId: string) => void;
   resetTimer: () => void;
   advanceRound: () => void;
+  undo: () => void;
+  redo: () => void;
   isRunning: boolean;
   timeRemaining: number;
 }
@@ -44,18 +46,108 @@ const ROUND_DURATION = 130; // 2 minutes 10 seconds
 export default function SessionProvider({ children }: SessionProviderProps) {
   const { toast } = useToast();
   const [mockData] = useState(() => generateMockData());
-
   const [session, setSession] = useState<Session>({
     currentRound: 0,
     startTime: new Date(),
     endTime: null,
     isRunning: false
   });
-
   const [timeRemaining, setTimeRemaining] = useState(ROUND_DURATION);
   const [rooms, setRooms] = useState<Room[]>(mockData.rooms);
   const [participants, setParticipants] = useState<Participant[]>(mockData.participants);
   const [leaders] = useState<Leader[]>(mockData.leaders);
+
+  const [undoStack, setUndoStack] = useState<Array<{
+    participants: Participant[];
+    rooms: Room[];
+    session: Session;
+  }>>([]);
+
+  const [redoStack, setRedoStack] = useState<Array<{
+    participants: Participant[];
+    rooms: Room[];
+    session: Session;
+  }>>([]);
+
+  const pushToHistory = useCallback(() => {
+    setUndoStack(prev => [
+      ...prev,
+      {
+        participants,
+        rooms,
+        session
+      }
+    ]);
+    setRedoStack([]);
+  }, [participants, rooms, session]);
+
+  const undo = useCallback(() => {
+    setUndoStack(prevUndo => {
+      if (prevUndo.length === 0) {
+        toast({
+          title: 'Nada para desfazer',
+          description: 'Nenhuma ação anterior encontrada.',
+        });
+        return prevUndo;
+      }
+
+      const lastState = prevUndo[prevUndo.length - 1];
+
+      setRedoStack(prevRedo => [
+        ...prevRedo,
+        {
+          participants,
+          rooms,
+          session
+        }
+      ]);
+
+      setParticipants(lastState.participants);
+      setRooms(lastState.rooms);
+      setSession(lastState.session);
+
+      toast({
+        title: 'Ação desfeita',
+        description: 'O último estado foi restaurado.',
+      });
+
+      return prevUndo.slice(0, -1);
+    });
+  }, [participants, rooms, session, toast]);
+
+  const redo = useCallback(() => {
+    setRedoStack(prevRedo => {
+      if (prevRedo.length === 0) {
+        toast({
+          title: 'Nada para refazer',
+          description: 'Nenhuma ação para refazer encontrada.',
+        });
+        return prevRedo;
+      }
+
+      const nextState = prevRedo[prevRedo.length - 1];
+
+      setUndoStack(prevUndo => [
+        ...prevUndo,
+        {
+          participants,
+          rooms,
+          session
+        }
+      ]);
+
+      setParticipants(nextState.participants);
+      setRooms(nextState.rooms);
+      setSession(nextState.session);
+
+      toast({
+        title: 'Ação refeita',
+        description: 'O estado foi restaurado novamente.',
+      });
+
+      return prevRedo.slice(0, -1);
+    });
+  }, [participants, rooms, session, toast]);
 
   // TIMER
   useEffect(() => {
@@ -84,6 +176,7 @@ export default function SessionProvider({ children }: SessionProviderProps) {
       title: "Session Started",
       description: "The randori session is now in progress.",
     });
+    pushToHistory();
   }, []);
 
   const pauseSession = useCallback(() => {
@@ -92,6 +185,7 @@ export default function SessionProvider({ children }: SessionProviderProps) {
       title: "Session Paused",
       description: "The randori session is now paused.",
     });
+    pushToHistory();
   }, []);
 
   const resetTimer = useCallback(() => {
@@ -100,6 +194,7 @@ export default function SessionProvider({ children }: SessionProviderProps) {
       title: "Timer Reset",
       description: "The timer has been reset to 2:10.",
     });
+    pushToHistory();
   }, []);
 
   const endSession = useCallback((roomId: string) => {
@@ -148,28 +243,29 @@ export default function SessionProvider({ children }: SessionProviderProps) {
       title: 'Sala finalizada',
       description: `A sala ${roomId} foi encerrada e os participantes foram redistribuídos.`,
     });
+    pushToHistory();
   }, [rooms, toast]);
-
 
   const rotateParticipants = useCallback(() => {
     setParticipants((prevParticipants) => {
       const updatedParticipants = [...prevParticipants];
 
-      rooms.forEach((room, roomIndex) => {
+      const activeRooms = rooms.filter(room => room.status === RoomStatus.Active);
+
+      activeRooms.forEach((room, roomIndex) => {
         const roomParticipants = updatedParticipants.filter(p => p.currentRoomId === room.id);
 
-        const pilot = roomParticipants.find(p => p.role === 'pilot');
-        const copilot = roomParticipants.find(p => p.role === 'copilot');
+        const pilot = roomParticipants.find(p => p.role === Role.Pilot);
+        const copilot = roomParticipants.find(p => p.role === Role.Copilot);
 
         if (pilot && copilot) {
-          const nextRoomIndex = (roomIndex + 1) % rooms.length;
-          const nextRoomId = rooms[nextRoomIndex].id;
+          const nextRoomIndex = (roomIndex + 1) % activeRooms.length;
+          const nextRoomId = activeRooms[nextRoomIndex].id;
 
-          // Atualizar o piloto: mover para próxima sala como observer
           const pilotIndex = updatedParticipants.findIndex(p => p.id === pilot.id);
           updatedParticipants[pilotIndex] = {
             ...updatedParticipants[pilotIndex],
-            role: 'observer',
+            role: Role.Observer,
             currentRoomId: nextRoomId,
             position: Math.max(
               ...updatedParticipants
@@ -179,40 +275,40 @@ export default function SessionProvider({ children }: SessionProviderProps) {
             ) + 1
           };
 
-          Logger.logRoleChange(pilot.id, pilot.name, 'pilot', 'observer');
+          Logger.logRoleChange(pilot.id, pilot.name, Role.Pilot, Role.Observer);
           Logger.logMovement(pilot.id, pilot.name, room.id, nextRoomId);
 
           // Atualizar o copilot atual para piloto
           const copilotIndex = updatedParticipants.findIndex(p => p.id === copilot.id);
           updatedParticipants[copilotIndex] = {
             ...updatedParticipants[copilotIndex],
-            role: 'pilot',
+            role: Role.Pilot,
             position: 0
           };
 
-          Logger.logRoleChange(copilot.id, copilot.name, 'copilot', 'pilot');
+          Logger.logRoleChange(copilot.id, copilot.name, Role.Copilot, Role.Pilot);
 
           // Promover o próximo observer para copilot
           const nextCopilot = roomParticipants
-            .filter(p => p.role === 'observer')
+            .filter(p => p.role === Role.Observer)
             .sort((a, b) => a.position - b.position)[0];
 
-          // Garante que se houver um próximo copilot, promovê-lo
           if (nextCopilot) {
             const nextCopilotIndex = updatedParticipants.findIndex(p => p.id === nextCopilot.id);
             updatedParticipants[nextCopilotIndex] = {
               ...updatedParticipants[nextCopilotIndex],
-              role: 'copilot',
+              role: Role.Copilot,
               position: 1
             };
 
-            Logger.logRoleChange(nextCopilot.id, nextCopilot.name, 'observer', 'copilot');
+            Logger.logRoleChange(nextCopilot.id, nextCopilot.name, Role.Observer, Role.Copilot);
           }
         }
       });
-
+      pushToHistory();
       return updatedParticipants;
     });
+
   }, [rooms]);
 
   const advanceRound = useCallback(() => {
@@ -226,7 +322,8 @@ export default function SessionProvider({ children }: SessionProviderProps) {
       title: "New Round Started",
       description: `Round ${session.currentRound + 1} has begun. Roles and rooms have been updated.`,
     });
-  }, [rotateParticipants, toast]);
+    pushToHistory();
+  }, [rotateParticipants, toast, session.currentRound]);
 
   return (
     <SessionContext.Provider
@@ -240,6 +337,8 @@ export default function SessionProvider({ children }: SessionProviderProps) {
         resetTimer,
         advanceRound,
         endSession,
+        undo,
+        redo,
         isRunning: session.isRunning,
         timeRemaining
       }}
