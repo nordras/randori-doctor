@@ -57,13 +57,13 @@ export default function SessionProvider({ children }: SessionProviderProps) {
   const [participants, setParticipants] = useState<Participant[]>(mockData.participants);
   const [leaders] = useState<Leader[]>(mockData.leaders);
 
-  const [undoStack, setUndoStack] = useState<Array<{
+  const [, setUndoStack] = useState<Array<{
     participants: Participant[];
     rooms: Room[];
     session: Session;
   }>>([]);
 
-  const [redoStack, setRedoStack] = useState<Array<{
+  const [, setRedoStack] = useState<Array<{
     participants: Participant[];
     rooms: Room[];
     session: Session;
